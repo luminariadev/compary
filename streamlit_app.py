@@ -77,7 +77,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["HEVC Quality", "Chroma Subsampling", "Color Q
 with tab1:
     st.header("HEVC Quality Reduction")
     hevc_file = st.file_uploader("Upload HEIC", type=["heic"], key="hevc_file")
-    hevc_qual = st.slider("Quality", 1, 100, 50, key="hevc_qual")
+    hevc_qual = st.slider("Quality", 1, 100, 10, key="hevc_qual")
     
     if hevc_file and st.button("Kompres - HEVC Quality"):
         # Save temp original
@@ -122,7 +122,7 @@ with tab2:
 with tab3:
     st.header("Color Quantization")
     color_file = st.file_uploader("Upload HEIC", type=["heic"], key="color_file")
-    color_val = st.number_input("Number of Colors (K-Means)", min_value=2, max_value=256, value=16, key="color_val")
+    color_val = st.number_input("Number of Colors (K-Means)", min_value=2, max_value=256, value=4, key="color_val")
     
     if color_file and st.button("Kompres - Color Quantization"):
         temp_orig = os.path.join(tempfile.gettempdir(), f"orig_{int(time.time())}.heic")
@@ -149,11 +149,11 @@ with tab4:
     
     c_col1, c_col2, c_col3 = st.columns(3)
     with c_col1:
-        c_hevc_qual = st.slider("HEVC Quality", 1, 100, 50, key="c_hevc_qual")
+        c_hevc_qual = st.slider("HEVC Quality", 1, 100, 10, key="c_hevc_qual")
     with c_col2:
         c_chroma_val = st.selectbox("Chroma Subsampling Format", ["4:2:0", "4:2:2", "4:4:4"], key="c_chroma_val")
     with c_col3:
-        c_color_val = st.number_input("Num Colors", min_value=2, max_value=256, value=16, key="c_color_val")
+        c_color_val = st.number_input("Num Colors", min_value=2, max_value=256, value=4, key="c_color_val")
         
     if comp_file and st.button("Jalankan Komparasi", type="primary"):
         temp_orig = os.path.join(tempfile.gettempdir(), f"orig_{int(time.time())}.heic")
