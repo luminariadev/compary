@@ -129,9 +129,9 @@ class MainWindow(ctk.CTkFrame):
         param_row = ctk.CTkFrame(self.tab_compare, fg_color="transparent")
         param_row.pack(fill=tk.X, pady=5)
         
-        self.comp_hevc_var = ctk.StringVar(value="50")
+        self.comp_hevc_var = ctk.StringVar(value="10")
         self.comp_chroma_var = ctk.StringVar(value="4:2:0")
-        self.comp_color_var = ctk.StringVar(value="16")
+        self.comp_color_var = ctk.StringVar(value="4")
         
         f1 = ctk.CTkFrame(param_row)
         f1.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
@@ -183,7 +183,7 @@ class MainWindow(ctk.CTkFrame):
         algo = self.algo_var.get()
         if algo == "HEVC Quality":
             ctk.CTkLabel(self.param_frame, text="Quality (1-100):").pack(side=tk.LEFT)
-            self.param_val_single = ctk.StringVar(value="50")
+            self.param_val_single = ctk.StringVar(value="10")
             ctk.CTkEntry(self.param_frame, textvariable=self.param_val_single, width=60).pack(side=tk.LEFT, padx=10)
         elif algo == "Chroma Subsampling":
             ctk.CTkLabel(self.param_frame, text="Subsampling:").pack(side=tk.LEFT)
@@ -191,7 +191,7 @@ class MainWindow(ctk.CTkFrame):
             ctk.CTkComboBox(self.param_frame, variable=self.param_val_single, values=["4:2:0", "4:2:2", "4:4:4"], width=100).pack(side=tk.LEFT, padx=10)
         elif algo == "Color Quantization":
             ctk.CTkLabel(self.param_frame, text="Colors:").pack(side=tk.LEFT)
-            self.param_val_single = ctk.StringVar(value="16")
+            self.param_val_single = ctk.StringVar(value="4")
             ctk.CTkEntry(self.param_frame, textvariable=self.param_val_single, width=60).pack(side=tk.LEFT, padx=10)
 
     def on_algo_change(self, choice):

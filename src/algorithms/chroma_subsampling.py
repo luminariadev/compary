@@ -16,15 +16,15 @@ def compress_chroma_subsampling(input_path, output_path, subsampling_type="4:2:0
     h, w = y.shape
     
     if subsampling_type == "4:2:0":
-        cr_sub = cv2.resize(cr, (w // 2, h // 2), interpolation=cv2.INTER_AREA)
-        cb_sub = cv2.resize(cb, (w // 2, h // 2), interpolation=cv2.INTER_AREA)
-        cr_up = cv2.resize(cr_sub, (w, h), interpolation=cv2.INTER_LINEAR)
-        cb_up = cv2.resize(cb_sub, (w, h), interpolation=cv2.INTER_LINEAR)
+        cr_sub = cv2.resize(cr, (w // 2, h // 2), interpolation=cv2.INTER_NEAREST)
+        cb_sub = cv2.resize(cb, (w // 2, h // 2), interpolation=cv2.INTER_NEAREST)
+        cr_up = cv2.resize(cr_sub, (w, h), interpolation=cv2.INTER_NEAREST)
+        cb_up = cv2.resize(cb_sub, (w, h), interpolation=cv2.INTER_NEAREST)
     elif subsampling_type == "4:2:2":
-        cr_sub = cv2.resize(cr, (w // 2, h), interpolation=cv2.INTER_AREA)
-        cb_sub = cv2.resize(cb, (w // 2, h), interpolation=cv2.INTER_AREA)
-        cr_up = cv2.resize(cr_sub, (w, h), interpolation=cv2.INTER_LINEAR)
-        cb_up = cv2.resize(cb_sub, (w, h), interpolation=cv2.INTER_LINEAR)
+        cr_sub = cv2.resize(cr, (w // 2, h), interpolation=cv2.INTER_NEAREST)
+        cb_sub = cv2.resize(cb, (w // 2, h), interpolation=cv2.INTER_NEAREST)
+        cr_up = cv2.resize(cr_sub, (w, h), interpolation=cv2.INTER_NEAREST)
+        cb_up = cv2.resize(cb_sub, (w, h), interpolation=cv2.INTER_NEAREST)
     else: # 4:4:4
         cr_up = cr
         cb_up = cb
