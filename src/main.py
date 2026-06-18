@@ -6,7 +6,7 @@ def main():
     # Register HEIF opener for Pillow
     register_heif_opener()
     
-    ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
+    ctk.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
     ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
     
     root = ctk.CTk()

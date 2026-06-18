@@ -27,9 +27,9 @@ class MainWindow(ctk.CTkFrame):
         # Style for Treeview to make it look good in light/dark mode
         style = ttk.Style()
         style.theme_use("default")
-        style.configure("Treeview", background="#f0f0f0", foreground="black", rowheight=25, fieldbackground="#f0f0f0")
+        style.configure("Treeview", background="#2b2b2b", foreground="white", rowheight=25, fieldbackground="#2b2b2b")
         style.map('Treeview', background=[('selected', '#0078D7')])
-        style.configure("Treeview.Heading", background="#d9d9d9", foreground="black", font=('Helvetica', 10, 'bold'))
+        style.configure("Treeview.Heading", background="#404040", foreground="white", font=('Helvetica', 10, 'bold'))
         
         self._create_widgets()
         
@@ -38,8 +38,8 @@ class MainWindow(ctk.CTkFrame):
         top_bar = ctk.CTkFrame(self, fg_color="transparent")
         top_bar.pack(fill=tk.X, pady=5)
         
-        self.theme_var = ctk.StringVar(value="System")
-        theme_cb = ctk.CTkComboBox(top_bar, variable=self.theme_var, values=["System", "Light", "Dark"], command=self.change_theme)
+        self.theme_var = ctk.StringVar(value="Dark")
+        theme_cb = ctk.CTkComboBox(top_bar, variable=self.theme_var, values=["Dark", "Light"], command=self.change_theme)
         theme_cb.pack(side=tk.RIGHT, padx=5)
         ctk.CTkLabel(top_bar, text="Theme:").pack(side=tk.RIGHT, padx=5)
         
@@ -169,12 +169,12 @@ class MainWindow(ctk.CTkFrame):
         ctk.set_appearance_mode(choice)
         # Update Treeview style
         style = ttk.Style()
-        if choice == "Dark":
-            style.configure("Treeview", background="#2b2b2b", foreground="white", fieldbackground="#2b2b2b")
-            style.configure("Treeview.Heading", background="#404040", foreground="white")
-        else: # Light or System (assumed light)
+        if choice == "Light":
             style.configure("Treeview", background="#f0f0f0", foreground="black", fieldbackground="#f0f0f0")
             style.configure("Treeview.Heading", background="#d9d9d9", foreground="black")
+        else: # Dark
+            style.configure("Treeview", background="#2b2b2b", foreground="white", fieldbackground="#2b2b2b")
+            style.configure("Treeview.Heading", background="#404040", foreground="white")
 
     def setup_parameters(self, *args):
         for widget in self.param_frame.winfo_children():
