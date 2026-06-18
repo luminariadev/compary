@@ -1,10 +1,6 @@
-import sys
 import os
-
-# Add src to path so we can import things properly
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
-
-from src.main import main
+import sys
 
 if __name__ == "__main__":
-    main()
+    print("Menjalankan Streamlit UI...")
+    os.system(f"{sys.executable} -m streamlit run streamlit_app.py")
