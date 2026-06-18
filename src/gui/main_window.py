@@ -1,5 +1,6 @@
+import customtkinter as ctk
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 import numpy as np
 import os
@@ -13,7 +14,7 @@ from src.algorithms.color_quantization import compress_color_quantization
 from src.metrics.quality_metrics import calculate_quality_metrics
 from src.metrics.compression_metrics import calculate_compression_metrics
 
-class MainWindow(ttk.Frame):
+class MainWindow(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
@@ -31,84 +32,104 @@ class MainWindow(ttk.Frame):
         
     def _create_widgets(self):
         # Top Frame: Controls
-        control_frame = ttk.LabelFrame(self, text="Controls")
+        control_frame = ctk.CTkFrame(self)
         control_frame.pack(fill=tk.X, pady=5)
         
         # Load Image Button
-        ttk.Button(control_frame, text="Load HEIC Image", command=self.load_image).grid(row=0, column=0, padx=5, pady=5)
-        self.lbl_image_path = ttk.Label(control_frame, text="No image loaded")
-        self.lbl_image_path.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+        btn_load = ctk.CTkButton(control_frame, text="Load HEIC Image", command=self.load_image)
+        btn_load.grid(row=0, column=0, padx=10, pady=10)
+        self.lbl_image_path = ctk.CTkLabel(control_frame, text="No image loaded")
+        self.lbl_image_path.grid(row=0, column=1, padx=10, pady=10, sticky="w")
         
         # Algorithm Selection
-        ttk.Label(control_frame, text="Algorithm:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.E)
-        self.algo_var = tk.StringVar(value="HEVC Quality")
-        algo_cb = ttk.Combobox(control_frame, textvariable=self.algo_var, values=["HEVC Quality", "Chroma Subsampling", "Color Quantization"], state="readonly")
-        algo_cb.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
-        algo_cb.bind("<<ComboboxSelected>>", self.on_algo_change)
+        lbl_algo = ctk.CTkLabel(control_frame, text="Algorithm:")
+        lbl_algo.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+        self.algo_var = ctk.StringVar(value="HEVC Quality")
+        algo_cb = ctk.CTkComboBox(control_frame, variable=self.algo_var, values=["HEVC Quality", "Chroma Subsampling", "Color Quantization"], command=self.on_algo_change)
+        algo_cb.grid(row=1, column=1, padx=10, pady=10, sticky="w")
         
         # Parameters Frame (Dynamic)
-        self.param_frame = ttk.Frame(control_frame)
-        self.param_frame.grid(row=1, column=2, padx=10, pady=5, sticky=tk.W)
+        self.param_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
+        self.param_frame.grid(row=1, column=2, padx=20, pady=10, sticky="w")
         self.setup_parameters()
         
         # Compress Button
-        ttk.Button(control_frame, text="Compress Image", command=self.run_compression).grid(row=1, column=3, padx=20, pady=5)
+        btn_compress = ctk.CTkButton(control_frame, text="Compress Image", command=self.run_compression, fg_color="#28a745", hover_color="#218838")
+        btn_compress.grid(row=1, column=3, padx=20, pady=10)
+        
+        # Theme toggle
+        self.theme_var = ctk.StringVar(value="System")
+        theme_cb = ctk.CTkComboBox(control_frame, variable=self.theme_var, values=["System", "Light", "Dark"], command=self.change_theme)
+        theme_cb.grid(row=0, column=3, padx=20, pady=10, sticky="e")
         
         # Middle Frame: Previews
-        preview_frame = ttk.Frame(self)
-        preview_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        preview_frame = ctk.CTkFrame(self, fg_color="transparent")
+        preview_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         
         # Original Preview
-        orig_frame = ttk.LabelFrame(preview_frame, text="Original Preview")
-        orig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-        self.lbl_orig_img = ttk.Label(orig_frame)
-        self.lbl_orig_img.pack(fill=tk.BOTH, expand=True)
+        orig_frame = ctk.CTkFrame(preview_frame)
+        orig_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+        lbl_orig_title = ctk.CTkLabel(orig_frame, text="Original Preview", font=ctk.CTkFont(weight="bold"))
+        lbl_orig_title.pack(pady=5)
+        self.lbl_orig_img = ctk.CTkLabel(orig_frame, text="")
+        self.lbl_orig_img.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Compressed Preview
-        comp_frame = ttk.LabelFrame(preview_frame, text="Compressed Preview")
-        comp_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-        self.lbl_comp_img = ttk.Label(comp_frame)
-        self.lbl_comp_img.pack(fill=tk.BOTH, expand=True)
+        comp_frame = ctk.CTkFrame(preview_frame)
+        comp_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+        lbl_comp_title = ctk.CTkLabel(comp_frame, text="Compressed Preview", font=ctk.CTkFont(weight="bold"))
+        lbl_comp_title.pack(pady=5)
+        self.lbl_comp_img = ctk.CTkLabel(comp_frame, text="")
+        self.lbl_comp_img.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Bottom Frame: Metrics
-        metrics_frame = ttk.LabelFrame(self, text="Metrics & Results")
-        metrics_frame.pack(fill=tk.X, pady=5)
+        metrics_frame = ctk.CTkFrame(self)
+        metrics_frame.pack(fill=tk.X, pady=10, padx=10)
         
-        columns = ("Algorithm", "Param", "Time (s)", "Orig Size", "Comp Size", "Ratio", "Space Save%", "BPP", "PSNR", "SSIM", "MSE")
-        self.tree = ttk.Treeview(metrics_frame, columns=columns, show="headings", height=5)
-        for col in columns:
-            self.tree.heading(col, text=col)
-            self.tree.column(col, width=80, anchor=tk.CENTER)
-        self.tree.pack(fill=tk.X, padx=5, pady=5)
+        lbl_metrics_title = ctk.CTkLabel(metrics_frame, text="Metrics & Results (Latest Run)", font=ctk.CTkFont(weight="bold"))
+        lbl_metrics_title.pack(pady=5)
         
-        ttk.Button(metrics_frame, text="Export Results CSV", command=self.export_csv).pack(pady=5)
+        self.metrics_text = ctk.CTkTextbox(metrics_frame, height=100)
+        self.metrics_text.pack(fill=tk.X, padx=10, pady=5)
+        self.metrics_text.insert("0.0", "No data yet.\n")
+        self.metrics_text.configure(state="disabled")
         
-    def setup_parameters(self):
+        btn_export = ctk.CTkButton(metrics_frame, text="Export All Results CSV", command=self.export_csv)
+        btn_export.pack(pady=10)
+        
+    def change_theme(self, choice):
+        ctk.set_appearance_mode(choice)
+
+    def setup_parameters(self, *args):
         for widget in self.param_frame.winfo_children():
             widget.destroy()
             
         algo = self.algo_var.get()
         if algo == "HEVC Quality":
-            ttk.Label(self.param_frame, text="Quality (1-100):").pack(side=tk.LEFT)
-            self.param_val = tk.IntVar(value=50)
-            ttk.Spinbox(self.param_frame, from_=1, to=100, textvariable=self.param_val, width=5).pack(side=tk.LEFT, padx=5)
+            ctk.CTkLabel(self.param_frame, text="Quality (1-100):").pack(side=tk.LEFT)
+            self.param_val = ctk.StringVar(value="50")
+            # Fallback to standard entry as CTk doesn't have a built-in Spinbox
+            entry = ctk.CTkEntry(self.param_frame, textvariable=self.param_val, width=60)
+            entry.pack(side=tk.LEFT, padx=10)
         elif algo == "Chroma Subsampling":
-            ttk.Label(self.param_frame, text="Subsampling:").pack(side=tk.LEFT)
-            self.param_val = tk.StringVar(value="4:2:0")
-            ttk.Combobox(self.param_frame, textvariable=self.param_val, values=["4:2:0", "4:2:2", "4:4:4"], width=8, state="readonly").pack(side=tk.LEFT, padx=5)
+            ctk.CTkLabel(self.param_frame, text="Subsampling:").pack(side=tk.LEFT)
+            self.param_val = ctk.StringVar(value="4:2:0")
+            cb = ctk.CTkComboBox(self.param_frame, variable=self.param_val, values=["4:2:0", "4:2:2", "4:4:4"], width=100)
+            cb.pack(side=tk.LEFT, padx=10)
         elif algo == "Color Quantization":
-            ttk.Label(self.param_frame, text="Colors:").pack(side=tk.LEFT)
-            self.param_val = tk.IntVar(value=16)
-            ttk.Spinbox(self.param_frame, from_=2, to=256, textvariable=self.param_val, width=5).pack(side=tk.LEFT, padx=5)
+            ctk.CTkLabel(self.param_frame, text="Colors:").pack(side=tk.LEFT)
+            self.param_val = ctk.StringVar(value="16")
+            entry = ctk.CTkEntry(self.param_frame, textvariable=self.param_val, width=60)
+            entry.pack(side=tk.LEFT, padx=10)
 
-    def on_algo_change(self, event):
+    def on_algo_change(self, choice):
         self.setup_parameters()
         
     def load_image(self):
         filepath = filedialog.askopenfilename(filetypes=[("HEIC Files", "*.heic;*.HEIC")])
         if filepath:
             self.original_image_path = filepath
-            self.lbl_image_path.config(text=os.path.basename(filepath))
+            self.lbl_image_path.configure(text=os.path.basename(filepath))
             
             # Load with pillow
             self.original_img_pil = Image.open(filepath).convert("RGB")
@@ -117,15 +138,17 @@ class MainWindow(ttk.Frame):
             # Display Original
             self.display_image(self.original_img_pil, self.lbl_orig_img)
             # Clear compressed
-            self.lbl_comp_img.config(image='')
+            self.lbl_comp_img.configure(image=None, text="")
             
     def display_image(self, img_pil, label_widget):
         # Resize for preview
         img_copy = img_pil.copy()
         img_copy.thumbnail((400, 400))
-        photo = ImageTk.PhotoImage(img_copy)
-        label_widget.config(image=photo)
-        label_widget.image = photo # Keep reference
+        
+        # ctk handles PIL images nicely if we use CTkImage
+        ctk_img = ctk.CTkImage(light_image=img_copy, dark_image=img_copy, size=img_copy.size)
+        label_widget.configure(image=ctk_img, text="")
+        label_widget.image = ctk_img # Keep reference
         
     def run_compression(self):
         if not self.original_image_path:
@@ -139,8 +162,6 @@ class MainWindow(ttk.Frame):
         temp_dir = tempfile.gettempdir()
         self.compressed_image_path = os.path.join(temp_dir, f"compressed_{int(time.time())}.heic")
         
-        # Disable button during processing
-        # Show busy cursor
         self.parent.config(cursor="wait")
         self.update()
         
@@ -163,7 +184,19 @@ class MainWindow(ttk.Frame):
             comp_metrics = calculate_compression_metrics(self.original_image_path, self.compressed_image_path, self.original_img_np)
             qual_metrics = calculate_quality_metrics(self.original_img_np, compressed_img_np)
             
-            # Insert to Treeview
+            # Update Metrics Textbox
+            result_str = (
+                f"Algorithm: {algo} | Parameter: {param} | Time: {time_taken:.2f} s\n"
+                f"Size: {comp_metrics['Original Size (bytes)']/1024:.2f} KB -> {comp_metrics['Compressed Size (bytes)']/1024:.2f} KB | "
+                f"Ratio: {comp_metrics['Compression Ratio']} | Space Savings: {comp_metrics['Space Savings (%)']}%\n"
+                f"BPP: {comp_metrics['BPP']} | PSNR: {qual_metrics['PSNR']} | SSIM: {qual_metrics['SSIM']} | MSE: {qual_metrics['MSE']}\n"
+            )
+            
+            self.metrics_text.configure(state="normal")
+            self.metrics_text.delete("0.0", "end")
+            self.metrics_text.insert("0.0", result_str)
+            self.metrics_text.configure(state="disabled")
+            
             row_data = (
                 algo, param, round(time_taken, 2),
                 comp_metrics["Original Size (bytes)"], comp_metrics["Compressed Size (bytes)"],
@@ -171,7 +204,6 @@ class MainWindow(ttk.Frame):
                 comp_metrics["BPP"],
                 qual_metrics["PSNR"], qual_metrics["SSIM"], qual_metrics["MSE"]
             )
-            self.tree.insert("", "end", values=row_data)
             self.results_data.append(row_data)
             
         except Exception as e:
