@@ -34,64 +34,57 @@ APP_CSS = """
         padding-bottom: 2rem;
     }
     .hero {
-        border: 1px solid #d7dde8;
+        border: 1px solid var(--secondary-background-color);
         border-radius: 8px;
         padding: 1rem 1.2rem;
         margin-bottom: 1rem;
-        background:
-            linear-gradient(135deg, rgba(20, 184, 166, 0.13), rgba(59, 130, 246, 0.10)),
-            rgba(255, 255, 255, 0.82);
+        background-color: var(--secondary-background-color);
     }
     .hero h1 {
         margin: 0 0 0.35rem 0;
         font-size: 1.9rem;
         line-height: 1.15;
         letter-spacing: 0;
+        color: var(--text-color);
     }
     .hero p {
         margin: 0;
-        color: #4b5563;
+        color: var(--text-color);
+        opacity: 0.8;
         font-size: 0.98rem;
     }
     [data-testid="stMetric"] {
-        border: 1px solid #d7dde8;
+        border: 1px solid var(--secondary-background-color);
         border-radius: 8px;
         padding: 0.72rem 0.85rem;
-        background: rgba(255, 255, 255, 0.78);
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
     }
     div[data-testid="stImage"] img {
-        border: 1px solid #d7dde8;
+        border: 1px solid var(--secondary-background-color);
         border-radius: 8px;
     }
     .status-ok {
         border-left: 5px solid #16a34a;
         border-radius: 8px;
         padding: 0.78rem 0.95rem;
-        background: #ecfdf5;
-        color: #14532d;
+        background-color: rgba(22, 163, 74, 0.15);
+        color: var(--text-color);
         margin: 0.35rem 0 0.75rem;
     }
     .status-warn {
         border-left: 5px solid #dc2626;
         border-radius: 8px;
         padding: 0.78rem 0.95rem;
-        background: #fef2f2;
-        color: #7f1d1d;
+        background-color: rgba(220, 38, 38, 0.15);
+        color: var(--text-color);
         margin: 0.35rem 0 0.75rem;
     }
     .muted {
-        color: #536175;
+        color: var(--text-color);
+        opacity: 0.75;
         margin-top: -0.2rem;
         margin-bottom: 0.8rem;
-    }
-    @media (prefers-color-scheme: dark) {
-        .hero, [data-testid="stMetric"] {
-            background: rgba(17, 24, 39, 0.78);
-            border-color: #334155;
-        }
-        .hero p, .muted {
-            color: #cbd5e1;
-        }
     }
 </style>
 """
