@@ -34,7 +34,7 @@ def compress_chroma_subsampling(input_path, output_path, subsampling_type="4:2:0
     
     out_img = Image.fromarray(img_rgb_reconstructed)
     # Save with high HEVC quality to isolate the effect of our manual chroma subsampling
-    out_img.save(output_path, "HEIF", quality=90)
+    out_img.save(output_path, "HEIF", quality=40)
     
     end_time = time.time()
     return end_time - start_time

@@ -1,241 +1,492 @@
-import streamlit as st
 import os
 import tempfile
 import time
-from PIL import Image
-import numpy as np
-from pillow_heif import register_heif_opener
-import pandas as pd
+from pathlib import Path
 
-from src.algorithms.hevc_quality import compress_hevc_quality
+import numpy as np
+import pandas as pd
+import streamlit as st
+from PIL import Image
+from pillow_heif import register_heif_opener
+
 from src.algorithms.chroma_subsampling import compress_chroma_subsampling
 from src.algorithms.color_quantization import compress_color_quantization
-from src.metrics.quality_metrics import calculate_quality_metrics
+from src.algorithms.hevc_quality import compress_hevc_quality
 from src.metrics.compression_metrics import calculate_compression_metrics
+from src.metrics.quality_metrics import calculate_quality_metrics
 
-# Register HEIF Opener
+
 register_heif_opener()
 
-st.set_page_config(page_title="HEIC Compression Compary", layout="wide", page_icon="🖼️")
+st.set_page_config(
+    page_title="HEIC Compression Lab",
+    page_icon=":camera:",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-st.title("HEIC Compression Comparison")
-st.markdown("Aplikasi komparasi 3 Algoritma Kompresi untuk format HEIC (Kelompok 9). Mode Dark/Light dapat diubah dari menu Settings pojok kanan atas.")
+
+APP_CSS = """
+<style>
+    .main .block-container {
+        max-width: 1320px;
+        padding-top: 1.35rem;
+        padding-bottom: 2rem;
+    }
+    .hero {
+        border: 1px solid #d7dde8;
+        border-radius: 8px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 1rem;
+        background:
+            linear-gradient(135deg, rgba(20, 184, 166, 0.13), rgba(59, 130, 246, 0.10)),
+            rgba(255, 255, 255, 0.82);
+    }
+    .hero h1 {
+        margin: 0 0 0.35rem 0;
+        font-size: 1.9rem;
+        line-height: 1.15;
+        letter-spacing: 0;
+    }
+    .hero p {
+        margin: 0;
+        color: #4b5563;
+        font-size: 0.98rem;
+    }
+    [data-testid="stMetric"] {
+        border: 1px solid #d7dde8;
+        border-radius: 8px;
+        padding: 0.72rem 0.85rem;
+        background: rgba(255, 255, 255, 0.78);
+    }
+    div[data-testid="stImage"] img {
+        border: 1px solid #d7dde8;
+        border-radius: 8px;
+    }
+    .status-ok {
+        border-left: 5px solid #16a34a;
+        border-radius: 8px;
+        padding: 0.78rem 0.95rem;
+        background: #ecfdf5;
+        color: #14532d;
+        margin: 0.35rem 0 0.75rem;
+    }
+    .status-warn {
+        border-left: 5px solid #dc2626;
+        border-radius: 8px;
+        padding: 0.78rem 0.95rem;
+        background: #fef2f2;
+        color: #7f1d1d;
+        margin: 0.35rem 0 0.75rem;
+    }
+    .muted {
+        color: #536175;
+        margin-top: -0.2rem;
+        margin-bottom: 0.8rem;
+    }
+    @media (prefers-color-scheme: dark) {
+        .hero, [data-testid="stMetric"] {
+            background: rgba(17, 24, 39, 0.78);
+            border-color: #334155;
+        }
+        .hero p, .muted {
+            color: #cbd5e1;
+        }
+    }
+</style>
+"""
+st.markdown(APP_CSS, unsafe_allow_html=True)
+
+
+ALGORITHM_OPTIONS = {
+    "HEVC Quality": {
+        "runner": compress_hevc_quality,
+        "suffix": "hevc",
+        "description": "Menurunkan kualitas encoder HEIC/HEVC.",
+    },
+    "Chroma Subsampling": {
+        "runner": compress_chroma_subsampling,
+        "suffix": "chroma",
+        "description": "Mengurangi resolusi warna dengan luminance tetap dijaga.",
+    },
+    "Color Quantization": {
+        "runner": compress_color_quantization,
+        "suffix": "color",
+        "description": "Mengurangi jumlah warna unik dengan clustering.",
+    },
+}
+
 
 if "history" not in st.session_state:
     st.session_state["history"] = []
+if "compare_results" not in st.session_state:
+    st.session_state["compare_results"] = []
+if "compare_visuals" not in st.session_state:
+    st.session_state["compare_visuals"] = []
+if "single_results" not in st.session_state:
+    st.session_state["single_results"] = []
+if "single_visuals" not in st.session_state:
+    st.session_state["single_visuals"] = []
 
-def handle_upload(uploaded_file):
-    """Save uploaded file to temp. If not HEIC, convert to HEIC first."""
-    temp_dir = tempfile.gettempdir()
-    base_name = uploaded_file.name.lower()
-    
-    if base_name.endswith(".heic"):
-        temp_orig = os.path.join(temp_dir, f"orig_{int(time.time()*1000)}.heic")
-        with open(temp_orig, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        return temp_orig
-    else:
-        # Convert to HEIC
-        temp_orig = os.path.join(temp_dir, f"orig_{int(time.time()*1000)}.heic")
-        img = Image.open(uploaded_file).convert("RGB")
-        img.save(temp_orig, "HEIF", quality=100)
-        st.info(f"File {uploaded_file.name} otomatis dikonversi ke HEIC untuk diproses.")
-        return temp_orig
 
-def process_and_display(img_path, original_np, algo_name, param):
-    st.write(f"### {algo_name}")
-    
-    temp_dir = tempfile.gettempdir()
-    comp_path = os.path.join(temp_dir, f"comp_{int(time.time()*1000)}.heic")
-    
-    time_taken = 0
-    with st.spinner(f"Memproses {algo_name}..."):
-        if algo_name == "HEVC Quality":
-            time_taken = compress_hevc_quality(img_path, comp_path, param)
-        elif algo_name == "Chroma Subsampling":
-            time_taken = compress_chroma_subsampling(img_path, comp_path, param)
-        elif algo_name == "Color Quantization":
-            time_taken = compress_color_quantization(img_path, comp_path, param)
-            
-    comp_pil = Image.open(comp_path).convert("RGB")
-    comp_np = np.array(comp_pil)
-    
-    comp_metrics = calculate_compression_metrics(img_path, comp_path, original_np)
-    qual_metrics = calculate_quality_metrics(original_np, comp_np)
-    
-    st.image(comp_pil, caption=f"Hasil: {algo_name}", use_container_width=True)
-    
-    st.markdown("**Metrik Performa:**")
-    m_col1, m_col2 = st.columns(2)
-    with m_col1:
-        st.metric("Time", f"{time_taken:.2f} s")
-        st.metric("Space Savings", f"{comp_metrics['Space Savings (%)']}%")
-        st.metric("Size", f"{comp_metrics['Compressed Size (bytes)'] / 1024:.2f} KB")
-    with m_col2:
-        st.metric("PSNR", f"{qual_metrics['PSNR']} dB")
-        st.metric("SSIM", f"{qual_metrics['SSIM']}")
-        st.metric("MSE", f"{qual_metrics['MSE']}")
-        
-    result_dict = {
+def format_bytes(size_bytes):
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    if size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.2f} KB"
+    return f"{size_bytes / (1024 * 1024):.2f} MB"
+
+
+def make_run_dir():
+    return tempfile.mkdtemp(prefix="heic_batch_")
+
+
+def safe_stem(filename):
+    stem = Path(filename).stem
+    cleaned = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in stem)
+    return cleaned[:60] or "image"
+
+
+def save_uploaded_heic(uploaded_file, run_dir, index):
+    file_ext = Path(uploaded_file.name).suffix.lower()
+    if file_ext not in [".heic", ".heif"]:
+        raise ValueError(f"{uploaded_file.name} bukan file HEIC/HEIF.")
+
+    output_path = os.path.join(run_dir, f"{index:02d}_{safe_stem(uploaded_file.name)}{file_ext}")
+    with open(output_path, "wb") as output:
+        output.write(uploaded_file.getbuffer())
+    return output_path
+
+
+def get_param_for_algorithm(algo_name, hevc_quality, chroma_value, color_count):
+    if algo_name == "HEVC Quality":
+        return int(hevc_quality)
+    if algo_name == "Chroma Subsampling":
+        return chroma_value
+    return int(color_count)
+
+
+def compress_one(original_path, original_np, original_name, index, algo_name, param, run_dir):
+    suffix = ALGORITHM_OPTIONS[algo_name]["suffix"]
+    output_path = os.path.join(
+        run_dir,
+        f"{index:02d}_{safe_stem(original_name)}_{suffix}_{int(time.time() * 1000)}.heic",
+    )
+
+    runner = ALGORITHM_OPTIONS[algo_name]["runner"]
+    time_taken = runner(original_path, output_path, param)
+
+    compressed_pil = Image.open(output_path).convert("RGB")
+    compressed_np = np.array(compressed_pil)
+    compression_metrics = calculate_compression_metrics(original_path, output_path, original_np)
+    quality_metrics = calculate_quality_metrics(original_np, compressed_np)
+
+    result = {
+        "File": original_name,
         "Algorithm": algo_name,
         "Parameter": param,
-        "Time (s)": round(time_taken, 2),
-        "Orig Size (B)": comp_metrics["Original Size (bytes)"],
-        "Comp Size (B)": comp_metrics["Compressed Size (bytes)"],
-        "Space Save (%)": comp_metrics["Space Savings (%)"],
-        "BPP": comp_metrics["BPP"],
-        "PSNR": qual_metrics["PSNR"],
-        "SSIM": qual_metrics["SSIM"],
-        "MSE": qual_metrics["MSE"]
+        "Time (s)": round(time_taken, 3),
+        "Original Size": format_bytes(compression_metrics["Original Size (bytes)"]),
+        "Compressed Size": format_bytes(compression_metrics["Compressed Size (bytes)"]),
+        "Original Size (bytes)": compression_metrics["Original Size (bytes)"],
+        "Compressed Size (bytes)": compression_metrics["Compressed Size (bytes)"],
+        "Compression Ratio": compression_metrics["Compression Ratio"],
+        "Space Save (%)": compression_metrics["Space Savings (%)"],
+        "BPP": compression_metrics["BPP"],
+        "PSNR": quality_metrics["PSNR"],
+        "SSIM": quality_metrics["SSIM"],
+        "MSE": quality_metrics["MSE"],
     }
-    st.session_state["history"].append(result_dict)
-    return result_dict
 
-tabs = st.tabs(["HEVC Quality", "Chroma Subsampling", "Color Quantization", "Komparasi", "Analisis Grafik Data", "Metrik Teoritis", "Metrik Empiris"])
-
-# Tab 1: HEVC
-with tabs[0]:
-    st.header("HEVC Quality Reduction")
-    hevc_file = st.file_uploader("Upload Image (HEIC/JPG/PNG)", type=["heic", "jpg", "jpeg", "png"], key="hevc_file")
-    hevc_qual = st.slider("Quality", 1, 100, 10, key="hevc_qual")
-    
-    if hevc_file and st.button("Kompres - HEVC Quality"):
-        temp_orig = handle_upload(hevc_file)
-        orig_pil = Image.open(temp_orig).convert("RGB")
-        orig_np = np.array(orig_pil)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(orig_pil, caption="Original", use_container_width=True)
-            st.metric("Original Size", f"{os.path.getsize(temp_orig) / 1024:.2f} KB")
-        with col2:
-            process_and_display(temp_orig, orig_np, "HEVC Quality", hevc_qual)
-
-# Tab 2: Chroma
-with tabs[1]:
-    st.header("Chroma Subsampling")
-    chroma_file = st.file_uploader("Upload Image (HEIC/JPG/PNG)", type=["heic", "jpg", "jpeg", "png"], key="chroma_file")
-    chroma_val = st.selectbox("Subsampling Format", ["4:2:0", "4:2:2", "4:4:4"], key="chroma_val")
-    
-    if chroma_file and st.button("Kompres - Chroma Subsampling"):
-        temp_orig = handle_upload(chroma_file)
-        orig_pil = Image.open(temp_orig).convert("RGB")
-        orig_np = np.array(orig_pil)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(orig_pil, caption="Original", use_container_width=True)
-            st.metric("Original Size", f"{os.path.getsize(temp_orig) / 1024:.2f} KB")
-        with col2:
-            process_and_display(temp_orig, orig_np, "Chroma Subsampling", chroma_val)
-
-# Tab 3: Color Quantization
-with tabs[2]:
-    st.header("Color Quantization")
-    color_file = st.file_uploader("Upload Image (HEIC/JPG/PNG)", type=["heic", "jpg", "jpeg", "png"], key="color_file")
-    color_val = st.number_input("Number of Colors (K-Means)", min_value=2, max_value=256, value=4, key="color_val")
-    
-    if color_file and st.button("Kompres - Color Quantization"):
-        temp_orig = handle_upload(color_file)
-        orig_pil = Image.open(temp_orig).convert("RGB")
-        orig_np = np.array(orig_pil)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(orig_pil, caption="Original", use_container_width=True)
-            st.metric("Original Size", f"{os.path.getsize(temp_orig) / 1024:.2f} KB")
-        with col2:
-            process_and_display(temp_orig, orig_np, "Color Quantization", int(color_val))
-
-# Tab 4: Komparasi
-with tabs[3]:
-    st.header("Komparasi Ketiga Algoritma")
-    st.write("Silakan upload 1 gambar dan sesuaikan parameter. Gambar non-HEIC akan otomatis dikonversi ke HEIC untuk menjadi baseline komparasi.")
-    
-    comp_file = st.file_uploader("Upload Image (HEIC/JPG/PNG)", type=["heic", "jpg", "jpeg", "png"], key="comp_file")
-    
-    c_col1, c_col2, c_col3 = st.columns(3)
-    with c_col1:
-        c_hevc_qual = st.slider("HEVC Quality", 1, 100, 10, key="c_hevc_qual")
-    with c_col2:
-        c_chroma_val = st.selectbox("Chroma Subsampling Format", ["4:2:0", "4:2:2", "4:4:4"], key="c_chroma_val")
-    with c_col3:
-        c_color_val = st.number_input("Num Colors", min_value=2, max_value=256, value=4, key="c_color_val")
-        
-    if comp_file and st.button("Jalankan Komparasi", type="primary"):
-        temp_orig = handle_upload(comp_file)
-        orig_pil = Image.open(temp_orig).convert("RGB")
-        orig_np = np.array(orig_pil)
-        
-        st.subheader("Gambar Original (Baseline)")
-        st.image(orig_pil, caption="Original", width=400)
-        
-        st.divider()
-        st.subheader("Hasil Kompresi Bersebelahan")
-        res_col1, res_col2, res_col3 = st.columns(3)
-        
-        with res_col1:
-            process_and_display(temp_orig, orig_np, "HEVC Quality", c_hevc_qual)
-        with res_col2:
-            process_and_display(temp_orig, orig_np, "Chroma Subsampling", c_chroma_val)
-        with res_col3:
-            process_and_display(temp_orig, orig_np, "Color Quantization", int(c_color_val))
-
-# Tab 5: Grafik Data
-with tabs[4]:
-    st.header("Analisis Grafik Data")
-    if not st.session_state["history"]:
-        st.info("Belum ada data kompresi. Silakan jalankan kompresi di tab sebelumnya terlebih dahulu.")
-    else:
-        df = pd.DataFrame(st.session_state["history"])
-        
-        # Agregasi data terbaru untuk setiap algoritma
-        df_last = df.drop_duplicates(subset=["Algorithm"], keep="last")
-        
-        st.subheader("Waktu Proses (detik)")
-        st.bar_chart(df_last.set_index("Algorithm")["Time (s)"])
-        
-        st.subheader("Penghematan Ruang / Space Savings (%)")
-        st.bar_chart(df_last.set_index("Algorithm")["Space Save (%)"])
-        
-        st.subheader("Kualitas Gambar (PSNR)")
-        st.bar_chart(df_last.set_index("Algorithm")["PSNR"])
-        
-        st.subheader("Kualitas Gambar (SSIM)")
-        st.line_chart(df_last.set_index("Algorithm")["SSIM"])
-
-# Tab 6: Metrik Teoritis
-with tabs[5]:
-    st.header("Tabel Metrik Komparasi Teoritis")
-    
-    st.markdown("""
-    Berdasarkan tinjauan teori sistem multimedia, berikut adalah komparasi karakteristik dari ketiga algoritma kompresi tersebut:
-    """)
-    
-    teori_data = {
-        "Aspek Komparasi": ["Fokus Utama Kompresi", "Kompleksitas Komputasi", "Rata-rata Space Savings", "Dampak Visual Utama", "Sifat Kompresi"],
-        "HEVC Quality Reduction": ["Pengurangan detail/resolusi frekuensi tinggi", "Tinggi (Encoding video/gambar full)", "Sangat Tinggi (Bisa >80%)", "Blurring, blockiness pada kualitas rendah", "Lossy"],
-        "Chroma Subsampling": ["Pengurangan resolusi warna (CbCr) dengan mempertahankan Luminance (Y)", "Rendah (Hanya konversi & resize channel warna)", "Rendah - Sedang (Maks ~50% di 4:2:0)", "Kehilangan detail warna pada tepian tajam", "Lossy (hanya warna)"],
-        "Color Quantization": ["Pengurangan jumlah warna unik (palette)", "Sedang - Tinggi (Algoritma Clustering/K-Means)", "Sedang (Sangat bergantung jumlah N warna)", "Color banding (warna nge-blok), posterisasi", "Lossy (palette restriction)"]
+    visual = {
+        "File": original_name,
+        "Algorithm": algo_name,
+        "Parameter": param,
+        "Original Path": original_path,
+        "Compressed Path": output_path,
+        "Original Size": result["Original Size"],
+        "Compressed Size": result["Compressed Size"],
+        "Space Save (%)": result["Space Save (%)"],
+        "PSNR": result["PSNR"],
+        "SSIM": result["SSIM"],
     }
-    
-    st.dataframe(pd.DataFrame(teori_data).set_index("Aspek Komparasi"), use_container_width=True)
+    return result, visual
 
-# Tab 7: Metrik Empiris
-with tabs[6]:
-    st.header("Metrik Hasil Empiris (Real-time)")
-    st.write("Tabel ini menyimpan seluruh riwayat kompresi yang Anda lakukan selama sesi ini berjalan.")
-    
-    if not st.session_state["history"]:
-        st.info("Belum ada data empiris.")
+
+def run_batch(uploaded_files, algorithms, hevc_quality, chroma_value, color_count, mode_label):
+    run_dir = make_run_dir()
+    batch_results = []
+    batch_visuals = []
+    total_steps = len(uploaded_files) * len(algorithms)
+    current_step = 0
+    progress = st.progress(0, text="Menyiapkan file HEIC...")
+
+    for file_index, uploaded_file in enumerate(uploaded_files, start=1):
+        original_path = save_uploaded_heic(uploaded_file, run_dir, file_index)
+        original_pil = Image.open(original_path).convert("RGB")
+        original_np = np.array(original_pil)
+
+        for algo_name in algorithms:
+            param = get_param_for_algorithm(algo_name, hevc_quality, chroma_value, color_count)
+            progress.progress(
+                current_step / total_steps,
+                text=f"{mode_label}: memproses {uploaded_file.name} dengan {algo_name}...",
+            )
+            result, visual = compress_one(
+                original_path,
+                original_np,
+                uploaded_file.name,
+                file_index,
+                algo_name,
+                param,
+                run_dir,
+            )
+            batch_results.append(result)
+            batch_visuals.append(visual)
+            current_step += 1
+
+    progress.progress(1.0, text="Selesai memproses minimal 10 file.")
+    return batch_results, batch_visuals
+
+
+def table_columns():
+    return [
+        "File",
+        "Algorithm",
+        "Parameter",
+        "Time (s)",
+        "Original Size",
+        "Compressed Size",
+        "Compression Ratio",
+        "Space Save (%)",
+        "BPP",
+        "PSNR",
+        "SSIM",
+        "MSE",
+    ]
+
+
+def render_summary_metrics(df_results):
+    avg_space = pd.to_numeric(df_results["Space Save (%)"], errors="coerce").mean()
+    avg_psnr = pd.to_numeric(df_results["PSNR"], errors="coerce").mean()
+    avg_ssim = pd.to_numeric(df_results["SSIM"], errors="coerce").mean()
+    avg_time = pd.to_numeric(df_results["Time (s)"], errors="coerce").mean()
+
+    cols = st.columns(4)
+    cols[0].metric("File Diuji", df_results["File"].nunique())
+    cols[1].metric("Rata-rata Saving", f"{avg_space:.2f}%")
+    cols[2].metric("Rata-rata PSNR", f"{avg_psnr:.2f} dB")
+    cols[3].metric("Rata-rata Waktu", f"{avg_time:.2f} s")
+    st.caption(f"Rata-rata SSIM: {avg_ssim:.4f}")
+
+
+def render_visual_outputs(visuals, compare_mode):
+    st.subheader("Output Gambar")
+    st.markdown(
+        "<p class='muted'>Hasil gambar muncul lebih dulu. Pilih file untuk melihat before/after hasil kompresi.</p>",
+        unsafe_allow_html=True,
+    )
+
+    files = sorted({item["File"] for item in visuals})
+    selected_file = st.selectbox("Pilih file hasil pengujian", files, key=f"visual_file_{compare_mode}")
+    selected_visuals = [item for item in visuals if item["File"] == selected_file]
+    before_path = selected_visuals[0]["Original Path"]
+
+    if len(selected_visuals) == 3:
+        before_col, hevc_col, chroma_col, color_col = st.columns(4)
+        before_col.image(Image.open(before_path).convert("RGB"), caption="Before", use_container_width=True)
+        for col, item in zip([hevc_col, chroma_col, color_col], selected_visuals):
+            col.image(
+                Image.open(item["Compressed Path"]).convert("RGB"),
+                caption=f"{item['Algorithm']} ({item['Parameter']})",
+                use_container_width=True,
+            )
+            col.metric("Saving", f"{item['Space Save (%)']}%")
     else:
-        df_history = pd.DataFrame(st.session_state["history"])
-        st.dataframe(df_history, use_container_width=True)
-        
-        csv = df_history.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="Download Log CSV",
-            data=csv,
-            file_name=f'komparasi_empiris_{int(time.time())}.csv',
-            mime='text/csv',
+        item = selected_visuals[0]
+        before_col, after_col = st.columns(2)
+        before_col.image(Image.open(before_path).convert("RGB"), caption="Before", use_container_width=True)
+        before_col.metric("Original Size", item["Original Size"])
+        after_col.image(
+            Image.open(item["Compressed Path"]).convert("RGB"),
+            caption=f"After: {item['Algorithm']} ({item['Parameter']})",
+            use_container_width=True,
         )
+        after_col.metric("Compressed Size", item["Compressed Size"])
+
+
+def render_table_outputs(df_results, mode_label):
+    st.subheader("Tabel Hasil Pengujian")
+    display_df = df_results[table_columns()]
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+    csv = display_df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download Tabel CSV",
+        data=csv,
+        file_name=f"hasil_{mode_label}_{int(time.time())}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+
+def render_chart_outputs(df_results):
+    st.subheader("Grafik Perbandingan")
+    numeric_cols = ["Time (s)", "Space Save (%)", "PSNR", "SSIM", "MSE", "BPP"]
+    chart_df = df_results.copy()
+    for col in numeric_cols:
+        chart_df[col] = pd.to_numeric(chart_df[col], errors="coerce")
+
+    avg_df = (
+        chart_df.groupby("Algorithm", as_index=False)[numeric_cols]
+        .mean()
+        .round(4)
+    )
+
+    chart_cols = st.columns(2)
+    with chart_cols[0]:
+        st.write("**Rata-rata Space Saving (%)**")
+        st.bar_chart(avg_df.set_index("Algorithm")["Space Save (%)"])
+        st.write("**Rata-rata Waktu Proses (detik)**")
+        st.bar_chart(avg_df.set_index("Algorithm")["Time (s)"])
+    with chart_cols[1]:
+        st.write("**Rata-rata PSNR**")
+        st.bar_chart(avg_df.set_index("Algorithm")["PSNR"])
+        st.write("**Rata-rata SSIM**")
+        st.line_chart(avg_df.set_index("Algorithm")["SSIM"])
+
+
+def render_results(results, visuals, mode_label):
+    if not results:
+        st.info("Output hasil pengujian akan muncul setelah minimal 10 file diproses.")
+        return
+
+    df_results = pd.DataFrame(results)
+    render_summary_metrics(df_results)
+    st.divider()
+    render_visual_outputs(visuals, mode_label)
+    st.divider()
+    render_table_outputs(df_results, mode_label)
+    st.divider()
+    render_chart_outputs(df_results)
+
+
+st.sidebar.title("Panel Pengujian")
+mode = st.sidebar.radio(
+    "Pilih alur",
+    ["Bandingkan 3 Algoritma", "Uji Satuan Algoritma"],
+)
+
+st.sidebar.divider()
+uploaded_files = st.sidebar.file_uploader(
+    "Upload minimal 10 file HEIC",
+    type=["heic", "heif"],
+    accept_multiple_files=True,
+    key=f"files_{mode}",
+)
+file_count = len(uploaded_files) if uploaded_files else 0
+
+if file_count >= 10:
+    st.sidebar.success(f"{file_count} file siap diproses.")
+else:
+    st.sidebar.warning(f"Minimal 10 file. Saat ini: {file_count} file.")
+
+st.sidebar.divider()
+
+if mode == "Bandingkan 3 Algoritma":
+    active_algorithms = list(ALGORITHM_OPTIONS.keys())
+    st.sidebar.subheader("Parameter 3 Algoritma")
+    hevc_quality = st.sidebar.slider("HEVC Quality", 1, 100, 20, key="compare_hevc")
+    chroma_value = st.sidebar.selectbox("Chroma Format", ["4:2:0", "4:2:2", "4:4:4"], key="compare_chroma")
+    color_count = st.sidebar.number_input("Jumlah Warna", 2, 256, 16, step=2, key="compare_color")
+    total_jobs = file_count * 3
+    run_label = "Proses Perbandingan 3 Algoritma"
+    session_result_key = "compare_results"
+    session_visual_key = "compare_visuals"
+else:
+    selected_algorithm = st.sidebar.selectbox("Pilih algoritma", list(ALGORITHM_OPTIONS.keys()))
+    active_algorithms = [selected_algorithm]
+    st.sidebar.subheader("Parameter Algoritma")
+    hevc_quality = st.sidebar.slider("HEVC Quality", 1, 100, 20, key="single_hevc")
+    chroma_value = st.sidebar.selectbox("Chroma Format", ["4:2:0", "4:2:2", "4:4:4"], key="single_chroma")
+    color_count = st.sidebar.number_input("Jumlah Warna", 2, 256, 16, step=2, key="single_color")
+    st.sidebar.caption(ALGORITHM_OPTIONS[selected_algorithm]["description"])
+    total_jobs = file_count
+    run_label = "Proses Algoritma Terpilih"
+    session_result_key = "single_results"
+    session_visual_key = "single_visuals"
+
+st.sidebar.caption(
+    f"Total pekerjaan: {file_count} file x {len(active_algorithms)} algoritma = {total_jobs} proses."
+)
+
+process_disabled = file_count < 10
+run_process = st.sidebar.button(
+    run_label,
+    type="primary",
+    disabled=process_disabled,
+    use_container_width=True,
+)
+
+if st.sidebar.button("Bersihkan Hasil Mode Ini", use_container_width=True):
+    st.session_state[session_result_key] = []
+    st.session_state[session_visual_key] = []
+    st.rerun()
+
+
+st.markdown(
+    """
+    <div class="hero">
+        <h1>HEIC Compression Lab</h1>
+        <p>Upload minimal 10 file HEIC dari sidebar, pilih alur pengujian, lalu lihat output gambar, tabel, dan grafik secara berurutan.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+if mode == "Bandingkan 3 Algoritma":
+    st.header("Membandingkan Langsung 3 Algoritma")
+    st.markdown(
+        "<p class='muted'>Alur ini menjalankan HEVC Quality, Chroma Subsampling, dan Color Quantization untuk setiap file.</p>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.header("Membandingkan Satuan Algoritma")
+    st.markdown(
+        f"<p class='muted'>Alur ini hanya menjalankan algoritma yang dipilih di sidebar: {active_algorithms[0]}.</p>",
+        unsafe_allow_html=True,
+    )
+
+if file_count >= 10:
+    st.markdown(
+        f"<div class='status-ok'>{file_count} file sudah memenuhi syarat minimal 10. Klik tombol proses di sidebar untuk menampilkan hasil pengujian.</div>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        f"<div class='status-warn'>Upload minimal 10 file HEIC agar output gambar, tabel, dan grafik bisa ditampilkan. Saat ini baru {file_count} file.</div>",
+        unsafe_allow_html=True,
+    )
+
+if run_process:
+    try:
+        results, visuals = run_batch(
+            uploaded_files,
+            active_algorithms,
+            hevc_quality,
+            chroma_value,
+            color_count,
+            mode,
+        )
+        st.session_state[session_result_key] = results
+        st.session_state[session_visual_key] = visuals
+        st.session_state["history"].extend(results)
+        st.success("Proses selesai. Output gambar, tabel, dan grafik sudah diperbarui.")
+    except Exception as exc:
+        st.error(f"Proses gagal: {exc}")
+
+render_results(
+    st.session_state[session_result_key],
+    st.session_state[session_visual_key],
+    "compare" if mode == "Bandingkan 3 Algoritma" else "single",
+)
