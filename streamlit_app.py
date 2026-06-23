@@ -148,13 +148,34 @@ def safe_stem(filename):
 
 
 def save_uploaded_heic(uploaded_file, run_dir, index):
+    import io
     file_ext = Path(uploaded_file.name).suffix.lower()
-    if file_ext not in [".heic", ".heif"]:
-        raise ValueError(f"{uploaded_file.name} bukan file HEIC/HEIF.")
-
-    output_path = os.path.join(run_dir, f"{index:02d}_{safe_stem(uploaded_file.name)}{file_ext}")
-    with open(output_path, "wb") as output:
-        output.write(uploaded_file.getbuffer())
+    output_path = os.path.join(run_dir, f"{index:02d}_{safe_stem(uploaded_file.name)}.heic")
+    
+    file_bytes = uploaded_file.getvalue()
+    
+    if file_ext in [".heic", ".heif"]:
+        with open(output_path, "wb") as output:
+            output.write(file_bytes)
+        try:
+            # Uji apakah file HEIC ini valid/bisa dibaca
+            with Image.open(output_path) as img:
+                img.verify()
+        except Exception:
+            # Jika gagal, mungkin ini JPG yang di-rename atau corrupt. Kita coba convert ulang.
+            try:
+                img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+                img.save(output_path, "HEIF", quality=100)
+            except Exception as e:
+                raise ValueError(f"File corrupt atau format tidak didukung.")
+    else:
+        # Otomatis konversi file JPG/PNG ke HEIC
+        try:
+            img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+            img.save(output_path, "HEIF", quality=100)
+        except Exception as e:
+            raise ValueError(f"Gagal mengonversi file: {e}")
+            
     return output_path
 
 
@@ -222,9 +243,14 @@ def run_batch(uploaded_files, algorithms, hevc_quality, chroma_value, color_coun
     progress = st.progress(0, text="Menyiapkan file HEIC...")
 
     for file_index, uploaded_file in enumerate(uploaded_files, start=1):
-        original_path = save_uploaded_heic(uploaded_file, run_dir, file_index)
-        original_pil = Image.open(original_path).convert("RGB")
-        original_np = np.array(original_pil)
+        try:
+            original_path = save_uploaded_heic(uploaded_file, run_dir, file_index)
+            original_pil = Image.open(original_path).convert("RGB")
+            original_np = np.array(original_pil)
+        except Exception as e:
+            st.warning(f"File '{uploaded_file.name}' dilewati karena bermasalah: {e}")
+            current_step += len(algorithms)
+            continue
 
         for algo_name in algorithms:
             param = get_param_for_algorithm(algo_name, hevc_quality, chroma_value, color_count)
@@ -379,8 +405,8 @@ mode = st.sidebar.radio(
 
 st.sidebar.divider()
 uploaded_files = st.sidebar.file_uploader(
-    "Upload minimal 10 file HEIC",
-    type=["heic", "heif"],
+    "Upload minimal 10 file (HEIC/JPG/PNG)",
+    type=["heic", "heif", "jpg", "jpeg", "png"],
     accept_multiple_files=True,
     key=f"files_{mode}",
 )
